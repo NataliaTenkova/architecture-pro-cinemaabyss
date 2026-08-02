@@ -1,0 +1,71 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/v2.0.1/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Архитектура КиноБездны — Strangler Fig Pattern (Transitional State)
+
+' ==================== ПОЛЬЗОВАТЕЛИ ====================
+Person(user, "Пользователь", "Клиент системы (Web/Mobile/TV)")
+
+' ==================== СИСТЕМНАЯ ГРАНИЦА ====================
+System_Boundary(cinemaabyss, "КиноБездна") {
+    
+    ' ---------- API Gateway (Единая точка входа) ----------
+    Container(api_gateway, "API Gateway (Proxy Service)", "Python/Go",  "Единая точка входа для всех запросов\nStrangler Fig Pattern\nФиче-флаг: GRADUAL_MIGRATION\nПроцент миграции: MOVIES_MIGRATION_PERCENT\n\nМаршрутизация:\n- /health → отдает статус\n- /api/movies → в монолит ИЛИ movies-service (по проценту)\n- /api/events → в events-service\n- /api/* → в монолит")
+    
+    ' ---------- СУЩЕСТВУЮЩАЯ СИСТЕМА (Монолит) ----------
+    Container_Boundary(monolith, "Legacy Monolith (As-Is)") {
+        Container(monolith_app, "Monolith App", "Go",   "Обрабатывает:\n- /api/users → все запросы\n- /api/payments → все запросы\n- /api/subscriptions → все запросы\n- /api/movies → ЧАСТИЧНО (по проценту 50%)\n- /health → все запросы")
+        
+        ContainerDb(monolith_db, "Monolith DB", "PostgreSQL",  "Единая БД:\n- Пользователи\n- Платежи\n- Подписки\n- Метаданные фильмов (пока)\n- Все остальные сущности")
+    }
+    
+    ' ---------- НОВЫЕ МИКРОСЕРВИСЫ (To-Be) ----------
+    Container_Boundary(new_services, "New Microservices (To-Be)") {
+        Container(movies_service, "Movies Service", "Go",  "Обрабатывает:\n- /api/movies → ЧАСТИЧНО (по проценту 50%)\n- /api/movies/health → проверка статуса\n\nУже выделен из монолита")
+        
+        ContainerDb(movies_db, "Movies DB", "PostgreSQL",  "Только метаданные фильмов\n(жанры, актеры, оценки)")
+        
+        Container(events_service, "Events Service", "Go", "Обрабатывает:\n- /api/events/* → все запросы\n- /api/events/health → проверка статуса\n\nНОВЫЙ функционал, отсутствует в монолите")
+        
+        ContainerDb(events_db, "Events DB", "PostgreSQL",  "События (movie, user, payment)")
+    }
+    
+    ' ---------- КОММУНИКАЦИЯ МЕЖДУ СТАРЫМ И НОВЫМ ----------
+    Container(monolith_adapter, "Monolith Adapter (Anti-Corruption Layer)", "Go",  "Адаптер для общения монолита с новыми сервисами\n(пока не реализован, но нужен в будущем)")
+}
+
+' ==================== ВНЕШНИЕ СИСТЕМЫ ====================
+System_Ext(payment_gateway, "Платежная система", "Stripe, CloudPayments")
+System_Ext(cdn, "CDN", "Видео-файлы, стриминг")
+
+' ==================== СВЯЗИ ====================
+
+' 1. Пользователь → API Gateway (единая точка)
+Rel(user, api_gateway, "Запросы", "HTTPS")
+
+' 2. API Gateway → Монолит (большая часть трафика)
+Rel(api_gateway, monolith_app, "По умолчанию: /api/users, /api/payments, /api/subscriptions\nЧастично: /api/movies (50%)", "HTTP")
+Rel(monolith_app, monolith_db, "CRUD", "SQL")
+
+' 3. API Gateway → Новые микросервисы (выборочно)
+Rel(api_gateway, movies_service, "По проценту: /api/movies (50%)\nПри GRADUAL_MIGRATION=true", "HTTP")
+Rel(movies_service, movies_db, "CRUD", "SQL")
+
+Rel(api_gateway, events_service, "Всегда: /api/events/*\nНовый функционал", "HTTP")
+Rel(events_service, events_db, "CRUD", "SQL")
+
+' 4. Адаптер (пока не активен)
+' Rel(monolith_app, monolith_adapter, "Запрос данных из новых сервисов", "HTTP")
+' Rel(monolith_adapter, movies_service, "Получение метаданных", "HTTP")
+' Rel(monolith_adapter, events_service, "Получение событий", "HTTP")
+
+' 5. Внешние системы
+Rel(monolith_app, payment_gateway, "Платежи (пока в монолите)", "HTTPS")
+Rel(monolith_app, cdn, "Стриминг (пока в монолите)", "HTTPS")
+
+' 6. В будущем (пунктир) — когда миграция завершится
+' Rel(api_gateway, movies_service, "100% трафика /api/movies", "HTTP")
+' Rel(monolith_app, monolith_db, "Уже без фильмов", "SQL")
+
+@enduml
