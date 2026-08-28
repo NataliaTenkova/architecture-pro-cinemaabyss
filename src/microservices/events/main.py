@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status
 
 from producer import producer
 from consumer import consumer
@@ -57,7 +57,7 @@ async def health_check():
     }
 
 
-@app.post("/api/events/movie", response_model=EventResponse)
+@app.post("/api/events/movie", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_movie_event(movie_event: MovieEvent, background_tasks: BackgroundTasks):
     """Создание события фильма"""
     try:
@@ -72,11 +72,11 @@ async def create_movie_event(movie_event: MovieEvent, background_tasks: Backgrou
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/events/user", response_model=EventResponse)
+@app.post("/api/events/user", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_event(user_event: UserEvent, background_tasks: BackgroundTasks):
     """Создание события пользователя"""
     try:
-        logger.info(f"Received user event: {user_event.dict()}")
+        logger.info(f"Received user event: {user_event.model_dump(mode='json')}")
         
         # Публикуем событие
         response = producer.publish_user_event(user_event)
@@ -87,7 +87,7 @@ async def create_user_event(user_event: UserEvent, background_tasks: BackgroundT
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/events/payment", response_model=EventResponse)
+@app.post("/api/events/payment", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment_event(payment_event: PaymentEvent, background_tasks: BackgroundTasks):
     """Создание события платежа"""
     try:
@@ -113,11 +113,10 @@ async def get_status():
     }
 
 if __name__ == "__main__":
-    PORT = os.getenv('PORT', '8082')
+    PORT = int(os.getenv('PORT', '8082'))
     uvicorn.run(
-        "app:app",
+        app,
         host="0.0.0.0",
         port=PORT,
-        log_level="info",
-        reload=True
+        log_level="info"
     )

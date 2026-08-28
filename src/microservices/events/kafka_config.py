@@ -42,8 +42,8 @@ def get_kafka_consumer(topic, group_id='events_service_group'):
             auto_offset_reset='earliest',
             enable_auto_commit=True,
             auto_commit_interval_ms=5000,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-            key_serializer=lambda k: k.encode('utf-8') if k else None,
+            value_deserializer=lambda v: json.loads(v.decode('utf-8')) if v else None,
+            key_deserializer=lambda k: k.decode('utf-8') if k else None,
         )
         logger.info(f"Kafka consumer created for topic {topic}")
         return consumer

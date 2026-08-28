@@ -36,10 +36,12 @@ class EventProducer:
     
     def _publish_event(self, topic: str, event: Event, key: str = None) -> EventResponse:
         try:
+            event_dict = event.model_dump(mode='json')
+
             future = self.producer.send(
                 topic=topic,
                 key=key,
-                value=event.dict()
+                value=event_dict
             )
             
             record_metadata = future.get(timeout=10)

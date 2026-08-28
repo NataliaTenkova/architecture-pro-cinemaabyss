@@ -48,7 +48,7 @@ class EventConsumer:
             payload = event.get('payload', {})
             
             log_message = {
-                'timestamp': datetime.now(),
+                'timestamp': datetime.now().isoformat(),
                 'topic': topic,
                 'event_id': event.get('id'),
                 'event_type': event_type,
@@ -57,7 +57,7 @@ class EventConsumer:
                 'payload': payload
             }
             
-            logger.info(f"Event processed: {json.dumps(log_message, default=str, ensure_ascii=False)}")
+            logger.info(f"Event processed: {log_message}")
             
             if event_type == 'movie':
                 self._handle_movie_event(payload)
